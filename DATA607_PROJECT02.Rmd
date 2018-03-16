@@ -1,0 +1,161 @@
+---
+title: "DATA 607 PROJECT 02"
+author: "A H M Shahparan"
+date: "3/11/2018"
+output: html_document
+---
+
+###Loading library
+```{r}
+library(readr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(corrplot)
+```
+
+###Dataset 01
+This dataset, retrieved from the Bureau of Labor Statistics, shows the median weekly incomes for 535 different occupations. The data encompasses information for all working American citizens as of January 2015. The incomes are broken into male and female statistics, preceded by the total median income when including both genders.
+####Importing data
+```{r}
+df = read_csv("https://raw.githubusercontent.com/ahmshahparan/DATA607_PROJECT02/master/inc_occ_gender.csv")
+```
+```{r}
+df
+```
+
+
+####Data definition
+Median weekly earnings of full-time wage and salary workers by detailed occupation and sex.
+
+Occupation: Job title as given from BLS. Industry summaries are given in ALL CAPS.</br>
+All_workers: Number of workers male and female, in thousands.</br>
+All_weekly: Median weekly income including male and female workers, in USD.</br>
+M_workers: Number of male workers, in thousands.</br>
+M_weekly: Median weekly income for male workers, in USD.</br>
+F_workers: Number of female workers, in thousands.</br>
+F_weekly: Median weekly income for female workers, in USD.
+
+####Collapsing columns into key-value pair. Collapsing based on gender division as gender, workers and their weekly median income as class.
+```{r}
+df %>% 
+    gather(key, value, 2:7) %>% 
+    separate(key, into=c("gender", "class"), sep="_") -> dt
+```
+
+####Transforming data and delation of missing value. 
+```{r}
+dt %>% mutate(value=as.numeric(value)) %>% na.omit() -> dt
+```
+
+```{r}
+dt
+```
+
+####Weekly income histogram for male, female and together.
+```{r}
+dt %>% 
+    filter(class=='weekly') %>%
+    ggplot(aes(x=value)) + 
+    geom_histogram(bins=50) + 
+    facet_grid(gender ~ .)
+```
+
+####Median income for male, female and together from tidy data dt.
+```{r}
+dt %>% 
+    filter(class == 'weekly') %>% 
+    group_by(gender) %>% 
+    summarize(median(value))
+```
+
+####Verifying the median calculation from initial data frame df.
+```{r}
+#Median income for male
+median(na.omit(as.numeric(df$M_weekly)))
+#Median income for female
+median(na.omit(as.numeric(df$F_weekly)))
+```
+
+
+###Dataset 02
+This data is from Environmental Protection Administration, Executive Yuan, R.O.C. (Taiwan).
+There is air quality data and meteorological monitoring data for research and analysis (only include northern Taiwan 2015).
+
+####Importing data
+```{r}
+df <- read.csv("https://raw.githubusercontent.com/ahmshahparan/DATA607_PROJECT02/master/2015y_Banqiao_Station.csv", stringsAsFactors = FALSE)
+str(df)
+```
+
+
+####Data definition
+Data definition can be found from [here.](https://www.kaggle.com/devisangeetha/lattice-vizualization-on-taiwan-air/data)
+
+####Data preparation
+I will do some data formatting. Date is currently in character, but I want to have it as type “Date”. All values of observations - columns 4 to 27 - should be numeric.
+```{r}
+df$date <- as.Date(df$date, format = "%Y/%m/%d")
+df$station <- as.factor(df$station)
+df$item <- as.factor(df$item)
+
+for(i in 4:27){
+        df[,i] <- suppressWarnings(as.numeric(df[,i]))
+}
+summary(df[,4:27])
+str(df)
+```
+####Tidy data
+The Hours are currently in columns, but these are observations (–> Rows!).</br>
+The column “item” contains the variables per row –> Columns
+
+I want to have the hours in rows. So I need a new column for ‘Hour’ (-> key = “Hour”) and the corresponding ‘Value’, currently spread of the column 4:27.
+```{r}
+gatherDf <- gather(df, key = "Hour", value = "Value", 4:27 )
+str(gatherDf)
+```
+But if we want to have the indicators spread over columns - no problem - just use spread()-function from tidyR.
+```{r}
+spreadDf <- spread(gatherDf, key = item, value = Value) 
+```
+Let’s check the result for the dataset.
+```{r}
+str(spreadDf)
+```
+
+###Dataset 03
+Prevalence of HIV refers to the percentage of people ages 15-49 who are infected with HIV.
+Data source can be found from [here.](https://www.gapminder.org/data/)
+
+####Importing data
+```{r}
+library(RCurl)
+library(tibble)
+url <- getURL("https://raw.githubusercontent.com/ahmshahparan/DATA607_PROJECT02/master/indicator%20hiv%20estimated%20prevalence%25%2015-49.csv")
+df <- read.csv(text = url, header = TRUE, check.names = FALSE)
+```
+####Tidy data
+```{r}
+colnames(df)[colnames(df) == "Estimated HIV Prevalence% - (Ages 15-49)"] <- "country"
+hiv <- as.tibble(df) %>%
+        gather(`1979`:`2011`, key = year, value = prec, na.rm = TRUE)
+```
+Find maximum HIV percentage for each country
+```{r}
+hiv %>%
+        group_by(country) %>%
+        summarise(max_perc = max(prec, na.rm = TRUE))
+```
+Find the country with max HIV prevalence percentage
+```{r}
+hiv %>%
+        group_by(country) %>%
+        summarise(max_perc = max(prec, na.rm = TRUE)) %>%
+        arrange(desc(max_perc))
+```
+Zimbabwe has the maximum HIV prevalence percentage followed by Botswana.
+
+
+
+
+
